@@ -395,8 +395,6 @@ if all([c in df_model.columns for c in req + ["global_score"]]):
 else:
     st.info("El archivo de puntaje no contiene todas las columnas necesarias.")
 
-st.markdown("---")
-
 # Conclusión
 st.markdown(
     f"""
@@ -449,6 +447,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+st.markdown("---")
 # ======================================================
 # 8. KMEANS (SIEMPRE SOBRE nba_puntaje_vara.csv)
 # ======================================================
@@ -548,6 +547,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
