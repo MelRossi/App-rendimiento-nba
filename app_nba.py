@@ -228,6 +228,28 @@ if st.sidebar.button("🔮 Predecir"):
 # 5. EDA — BARRA / LÍNEA / SCATTER
 # ======================================================
 
+# ======= Vista previa del dataset (HEAD) =======
+st.markdown(
+    f"""
+    <h3 style='color:{COLOR_ACCENT}; font-weight:700; margin-top:15px;'>
+        📄 Vista previa del dataset seleccionado
+    </h3>
+    """,
+    unsafe_allow_html=True
+)
+
+col_preview_1, col_preview_2 = st.columns([1,3])
+
+with col_preview_1:
+    num_rows = st.slider("Filas a mostrar", 5, 30, 5)
+
+with col_preview_2:
+    st.write("Mostrando las primeras filas del dataframe:")
+
+st.dataframe(df_nba.head(num_rows), use_container_width=True)
+
+st.markdown("---")
+
 st.markdown(
     f"<h2 style='color:{COLOR_ACCENT}; font-weight:700;'>📊 Exploración de Datos (EDA)</h2>",
     unsafe_allow_html=True
@@ -467,4 +489,5 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
