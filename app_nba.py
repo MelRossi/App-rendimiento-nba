@@ -1,83 +1,44 @@
+# app_nba_full.py
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import KMeans
+from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import r2_score, mean_absolute_error
+from sklearn.exceptions import NotFittedError
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
 # ============================
-# CONFIGURACIÓN GENERAL Y ESTILOS
+# CONFIG
 # ============================
 
-# Establece el layout en modo 'wide' para pantalla completa
-st.set_page_config(
-    page_title="NBA Analytics Dashboard",
-    layout="wide",
-    page_icon="🏀"
-)
+st.set_page_config(page_title="NBA Analytics - Multi CSV", layout="wide", page_icon="🏀")
 
-# URL para el dataset principal si no se sube un archivo (FALLBACK)
-# NOTA: Debes reemplazar esta URL con la ruta real de tu archivo en GitHub.
-GITHUB_MAIN_CSV_URL = "https://raw.githubusercontent.com/user/repo/main/nba_puntaje_vara.csv"
-
-# PALETA DE COLORES PROPIA
+# Colores (tomados de tu app original)
 COLOR_BG = "#012E40"
-COLOR_ACCENT = "#F28705" # Naranja brillante
+COLOR_ACCENT = "#F28705"  # Naranja brillante
 COLOR_1 = "#025159"    # Azul oscuro verdoso
 COLOR_2 = "#038C8C"    # Cian
 COLOR_3 = "#03A696"    # Verde agua
 
-st.markdown(
-    f"""
-    <style>
-    /* Estilos generales para la aplicación */
-    .title {{
-        font-size: 50px;
-        text-align: center;
-        font-weight: bold;
-        color: {COLOR_ACCENT};
-    }}
-    .stApp {{
-        background-color: {COLOR_BG};
-    }}
-    /* Estilos para los headers de las secciones */
-    .stHeader, h1, h2, h3, h4, h5, h6 {{
-        color: {COLOR_3} !important;
-    }}
-    /* Ajuste para el sidebar */
-    .css-1d391kg {{
-        background-color: #001f2b; /* Fondo un poco más oscuro para el sidebar */
-    }}
-    .sidebar-header {{
-        color: {COLOR_ACCENT};
-        font-size: 24px;
-        font-weight: bold;
-        margin-bottom: 10px;
-    }}
-    /* Estilo para los gráficos de Matplotlib/Seaborn dentro de Streamlit */
-    .stPlot {{
-        background-color: {COLOR_BG};
-    }}
-    /* Configurar el color de fondo de las figuras para que coincida con el fondo */
-    .plt-container {{
-        background-color: {COLOR_BG} !important;
-    }}
-    /* Ajuste para que el texto de los widgets sea blanco */
-    .stSlider label, .stSelectbox label, .stDownloadButton, .stButton, .stMarkdown, .stTable, .dataframe-content, .stTextInput, .stFileUploader label, .stRadio label {{
-        color: white !important;
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# Raw base URL del repo que nos diste
+RAW_BASE = "https://raw.githubusercontent.com/MelRossi/App-rendimiento-nba/main/"
 
-# ============================
-# DEFINICIONES DE MODELO Y DATOS
-# ============================
+CSV_FILES = {
+    "all_seasons": "all_seasons_filtrado.csv",
+    "game": "game_filtrado.csv",
+    "player": "player_filtrado.csv",
+    "team": "team_filtrado.csv",
+    "line_score": "line_score_filtrado.csv",
+    "puntaje": "nba_puntaje_vara.csv",
+    "resumen": "resumen.csv"
+}
 
+# Features (mantengo las tuyas)
 TARGET = "global_score"
 FEATURES_REG = [
     "ts_pct_score","usg_pct_score","dreb_pct_score","ast_pct_score",
@@ -88,474 +49,346 @@ FEATURES_CLUSTER = [
     'oreb_pct_score','dreb_pct_score','net_rating_score'
 ]
 
-# RANGOS PREDETERMINADOS (Fallback para los sliders)
-DEFAULT_RANGES = {
-    "ts_pct_score": {"min": 0.4, "max": 0.8, "mean": 0.6},
-    "usg_pct_score": {"min": 0.1, "max": 0.4, "mean": 0.25},
-    "dreb_pct_score": {"min": 0.05, "max": 0.35, "mean": 0.2},
-    "ast_pct_score": {"min": 0.05, "max": 0.4, "mean": 0.2},
-    "oreb_pct_score": {"min": 0.0, "max": 0.2, "mean": 0.1},
-    "age": {"min": 18, "max": 40, "mean": 27},
-    "player_height": {"min": 170, "max": 220, "mean": 200},
-    "player_weight": {"min": 70, "max": 130, "mean": 100}
-}
-
-# ============================
-# LÓGICA DE CARGA DE DATOS (Centralizada)
-# ============================
-
-@st.cache_data
-def load_data(source, url=None):
-    """Carga el dataset principal, ya sea por upload o por URL."""
-    if source == "upload" and st.session_state.uploaded_file is not None:
-        try:
-            df = pd.read_csv(st.session_state.uploaded_file)
-            return df, "Archivo subido exitosamente."
-        except Exception as e:
-            st.error(f"Error al cargar el archivo CSV: {e}")
-            return pd.DataFrame(), f"Error al cargar el archivo: {e}"
-    
-    elif source == "default" and url is not None:
-        try:
-            # st.cache_data funciona como cache para la carga remota también
-            df = pd.read_csv(url)
-            return df, f"Dataset principal precargado desde GitHub: {url}"
-        except Exception as e:
-            st.warning(f"No se pudo precargar el dataset desde GitHub. Sube un archivo. Error: {e}")
-            return pd.DataFrame(), "No se pudo precargar el dataset."
-            
-    return pd.DataFrame(), "Esperando carga de datos."
-
-# Lógica de Entrenamiento del Modelo
-@st.cache_resource
-def train_regression_model(data, features, target_col):
-    """Entrena y devuelve el modelo de Regresión Lineal y el conjunto de referencia."""
-    
-    if data is None or data.empty:
-        return None, None
-        
-    required_cols = features + [target_col]
-    missing_cols = [col for col in required_cols if col not in data.columns]
-    
-    if missing_cols:
-        st.error(f"Error de columna: Faltan las siguientes columnas para el modelo de Regresión: {', '.join(missing_cols)}")
-        return None, None
-
-    try:
-        data_clean = data[required_cols].dropna() 
-        
-        if data_clean.empty:
-            st.error("Error: Después de eliminar valores nulos, el dataset para el modelo está vacío.")
-            return None, None
-            
-        X = data_clean[features]
-        y = data_clean[target_col]
-
-        model = LinearRegression()
-        model.fit(X, y)
-        return model, X # X se devuelve como referencia para la evaluación
-    except Exception as e:
-        st.error(f"Error inesperado durante el entrenamiento del modelo: {e}")
-        return None, None
-
-# ============================
-# CONTENIDO PRINCIPAL: TÍTULO Y CARGA
-# ============================
-
-st.markdown("<h1 class='title'>🏀 NBA Performance Analytics</h1>", unsafe_allow_html=True)
-
+# CSS básico para fondo y títulos
 st.markdown(
     f"""
-    <h4 style="color:{COLOR_3}; text-align:center;">
-        Análisis avanzado de rendimiento y clusters
-    </h4>
+    <style>
+    .stApp {{ background-color: {COLOR_BG}; color: white; }}
+    .title {{ font-size: 48px; text-align:center; color: {COLOR_ACCENT}; font-weight:700; }}
+    .sub {{ color: {COLOR_3}; text-align:center; }}
+    .sidebar .stSlider > label {{ color: white; }}
+    .card {{ background-color: {COLOR_1}; padding: 10px; border-radius: 8px; }}
+    </style>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
 
-st.header("📂 Fuente de Datos")
-col_upload, col_source_info = st.columns([2, 1])
+# ============================
+# LOAD ALL CSVs (from GitHub raw)
+# ============================
+@st.cache_data
+def load_all_csvs(base_url, csv_files):
+    dfs = {}
+    messages = []
+    for key, fname in csv_files.items():
+        url = base_url + fname
+        try:
+            df = pd.read_csv(url)
+            dfs[key] = df
+            messages.append(f"Cargado: {fname} ({len(df):,} filas)")
+        except Exception as e:
+            dfs[key] = pd.DataFrame()
+            messages.append(f"No se pudo cargar {fname}: {e}")
+    return dfs, messages
 
-# Inicializar estado para el uploader si no existe
-if 'uploaded_file' not in st.session_state:
-    st.session_state.uploaded_file = None
+dfs, load_msgs = load_all_csvs(RAW_BASE, CSV_FILES)
 
-with col_upload:
-    uploaded_file = st.file_uploader(
-        "Sube tu archivo 'nba_puntaje_vara.csv' para reemplazar el precargado.", 
-        type=['csv'], 
-        key='main_uploader'
-    )
-    # Actualizar el estado de sesión
-    if uploaded_file is not None and st.session_state.uploaded_file != uploaded_file:
-         st.session_state.uploaded_file = uploaded_file
-         st.rerun()
+# Mostrar título y estado de carga
+st.markdown("<div class='title'>🏀 NBA Performance Analytics (Multi CSV)</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='sub'>EDA, Clustering y Predicción simple de potencial</div>", unsafe_allow_html=True)
+st.markdown("---")
 
-# Determinar la fuente de datos a cargar
-if st.session_state.uploaded_file:
-    df_nba, load_status_message = load_data("upload")
-    source_message = "Local (Archivo subido)"
+col1, col2 = st.columns([3,1])
+with col1:
+    st.header("📂 Datasets cargados")
+    for m in load_msgs:
+        if m.startswith("Cargado"):
+            st.success(m)
+        else:
+            st.warning(m)
+with col2:
+    st.image("Image_logo.png" if 'Image_logo.png' in st.file_uploader else None, width=100)  # si existe en local del repo
+
+# Referencia principal: dataframe de puntaje (tu 'nba_puntaje_vara.csv')
+df_nba = dfs.get("puntaje", pd.DataFrame())
+
+# Si está vacío, intentar tomar otro (player/resumen) como fallback
+if df_nba.empty:
+    df_nba = dfs.get("all_seasons", pd.DataFrame())
+
+# Si sigue vacío, mostramos aviso y paramos el EDA interactivo (pero permitimos ver archivos cargados)
+if df_nba.empty:
+    st.error("No se encontró el dataset principal para análisis (nba_puntaje_vara.csv o all_seasons_filtrado.csv). Algunas funcionalidades estarán limitadas.")
 else:
-    df_nba, load_status_message = load_data("default", GITHUB_MAIN_CSV_URL)
-    source_message = "GitHub (Precargado por defecto)"
+    st.success(f"Dataset principal listo: {df_nba.shape[0]:,} filas x {df_nba.shape[1]:,} columnas")
 
-with col_source_info:
-    st.info(f"Fuente actual: **{source_message}**")
-    if "Error" in load_status_message:
-        st.error(load_status_message)
+st.markdown("---")
+
+# ============================
+# PREP: crear etiqueta binaria 'potencial' con percentil 75
+# ============================
+classifier = None
+scaler = None
+potential_threshold = None
+
+def prepare_potential_label(df, target_col="global_score", q=0.75):
+    if target_col not in df.columns:
+        return df, None
+    thresh = df[target_col].dropna().quantile(q)
+    df = df.copy()
+    df["potencial_bin"] = (df[target_col] >= thresh).astype(int)
+    return df, float(thresh)
+
+if not df_nba.empty and TARGET in df_nba.columns:
+    df_nba, potential_threshold = prepare_potential_label(df_nba, TARGET, 0.75)
+
+# Entrenar un clasificador simple si hay suficientes filas y las features existen
+def train_simple_classifier(df, features, target_col="potencial_bin"):
+    # verificar columnas
+    if df is None or df.empty:
+        return None, None
+    if not all([f in df.columns for f in features]) or target_col not in df.columns:
+        return None, None
+    # limpiar nans
+    dfc = df[features + [target_col]].dropna()
+    if dfc.shape[0] < 30:
+        return None, None
+    X = dfc[features]
+    y = dfc[target_col]
+    sc = StandardScaler()
+    Xs = sc.fit_transform(X)
+    Xtr, Xte, ytr, yte = train_test_split(Xs, y, test_size=0.2, random_state=42, stratify=y)
+    clf = LogisticRegression(max_iter=500)
+    clf.fit(Xtr, ytr)
+    # opcional: evaluar
+    try:
+        ypred = clf.predict(Xte)
+        acc = accuracy_score(yte, ypred)
+    except Exception:
+        acc = None
+    return (clf, sc, acc)
+
+if potential_threshold is not None:
+    clf_res = train_simple_classifier(df_nba, FEATURES_REG, "potencial_bin")
+    if clf_res is not None:
+        classifier, scaler, clf_acc = clf_res
     else:
-        st.success(load_status_message)
+        classifier, scaler, clf_acc = None, None, None
+else:
+    classifier, scaler, clf_acc = None, None, None
 
-# Entrenar el modelo y verificar la carga
-model, X_ref = train_regression_model(df_nba, FEATURES_REG, TARGET)
+# Mostrar info del clasificador
+st.markdown("### 🔧 Estado del clasificador de 'potencial'")
+if potential_threshold is None:
+    st.info("No hay columna 'global_score' para calcular etiqueta 'potencial'. La predicción usará heurística simple.")
+else:
+    st.write(f"Umbral de potencial (percentil 75) = **{potential_threshold:.4f}**")
+    if classifier is not None:
+        st.success(f"Clasificador entrenado con {len(df_nba.dropna(subset=FEATURES_REG)):,} filas. Accuracy (validación) ≈ {clf_acc:.3f}" if clf_acc else "Clasificador entrenado.")
+    else:
+        st.warning("No se entrenó un clasificador (datos insuficientes o faltan columnas). Se aplicará heurística basada en umbral/regresión.")
+
+st.markdown("---")
 
 # ============================
-# BARRA LATERAL: PREDICCIÓN MANUAL
+# SIDEBAR: PREDICCIÓN MANUAL (sliders numéricos)
 # ============================
+st.sidebar.markdown(f"<h3 style='color:{COLOR_ACCENT};'>🚀 Predicción de Potencial (Manual)</h3>", unsafe_allow_html=True)
+st.sidebar.write("Introduce valores numéricos para el jugador. Luego presiona 'Predecir'.")
 
-st.sidebar.markdown("<p class='sidebar-header'>🚀 Predicción Individual</p>", unsafe_allow_html=True)
+# Determinar rangos dinámicos a partir de df_nba o default
+DEFAULT_RANGES = {
+    "ts_pct_score": {"min": 0.0, "max": 1.0, "mean": 0.5},
+    "usg_pct_score": {"min": 0.0, "max": 1.0, "mean": 0.25},
+    "dreb_pct_score": {"min": 0.0, "max": 1.0, "mean": 0.1},
+    "ast_pct_score": {"min": 0.0, "max": 1.0, "mean": 0.1},
+    "oreb_pct_score": {"min": 0.0, "max": 1.0, "mean": 0.05},
+    "age": {"min": 16, "max": 45, "mean": 26},
+    "player_height": {"min": 160, "max": 230, "mean": 198},
+    "player_weight": {"min": 60, "max": 140, "mean": 95}
+}
 
-if model is None:
-    st.sidebar.warning("El modelo de predicción no está disponible. Verifica si el dataset contiene las columnas requeridas.")
-
-datos_usuario = {}
-
-# Determinar los rangos a usar: Default si no hay datos, o dinámicos si hay datos
-rangos_prediccion = {}
+rangos = {}
 for col in FEATURES_REG:
     if not df_nba.empty and col in df_nba.columns:
-        rangos_prediccion[col] = {
-            "min": df_nba[col].min(),
-            "max": df_nba[col].max(),
-            "mean": df_nba[col].mean()
-        }
-    else:
-         rangos_prediccion[col] = DEFAULT_RANGES[col]
-
-
-# Crear los Sliders en la barra lateral usando los rangos definidos
-for col in FEATURES_REG:
-    rango = rangos_prediccion.get(col, DEFAULT_RANGES[col]) # Usar el rango calculado o el default
-    
-    # Determinar el paso (step) del slider
-    if 'score' in col or 'pct' in col:
-        step_val = 0.01 
-        fmt = "%.2f"
-    elif col in ['age', 'player_height', 'player_weight']:
-        step_val = 1.0 
-        fmt = "%g"
-    else:
-        step_val = 1.0 
-        fmt = "%g"
-    
-    # Asegurar que el valor inicial esté dentro del rango
-    mean_val_safe = max(float(rango["min"]), min(float(rango["max"]), float(rango["mean"])))
-    
-    valor = st.sidebar.slider(
-        f"**{col}**", 
-        float(rango["min"]), 
-        float(rango["max"]), 
-        float(mean_val_safe), 
-        step=step_val,
-        format=fmt
-    )
-    datos_usuario[col] = valor
-
-st.sidebar.markdown("---")
-
-# Botón y Lógica de Predicción
-if st.sidebar.button(":dart: **Predecir Global Score**"):
-    if model is not None:
         try:
-            df_usuario = pd.DataFrame([datos_usuario])
-            df_usuario_final = df_usuario[FEATURES_REG]
-
-            # Realizar la predicción
-            prediccion = model.predict(df_usuario_final)[0]
-            
-            # Mostrar el resultado con un formato llamativo
-            st.sidebar.markdown(f"""
-            <div style="text-align: center; border: 2px solid {COLOR_ACCENT}; padding: 10px; border-radius: 10px; background-color: {COLOR_1};">
-                <p style="font-size: 18px; margin: 0; color: white;">Global Score Estimado:</p>
-                <p style="font-size: 36px; font-weight: bold; margin: 0; color: {COLOR_ACCENT};">{prediccion:.4f}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        except Exception as e:
-            st.sidebar.error(f"Error en la predicción. Detalle: {e}")
+            rangos[col] = {
+                "min": float(df_nba[col].min()),
+                "max": float(df_nba[col].max()),
+                "mean": float(df_nba[col].median())
+            }
+        except Exception:
+            rangos[col] = DEFAULT_RANGES.get(col, {"min":0,"max":1,"mean":0.5})
     else:
-        st.sidebar.warning("Carga un archivo válido para entrenar el modelo antes de predecir.")
+        rangos[col] = DEFAULT_RANGES.get(col, {"min":0,"max":1,"mean":0.5})
+
+# Crear sliders
+input_vals = {}
+for col in FEATURES_REG:
+    r = rangos[col]
+    if 'score' in col or 'pct' in col:
+        step = 0.01
+        fmt = "%.2f"
+        val = st.sidebar.slider(f"{col}", float(r["min"]), float(r["max"]), float(r["mean"]), step=step, format=fmt)
+    else:
+        step = 1
+        val = st.sidebar.slider(f"{col}", int(np.floor(r["min"])), int(np.ceil(r["max"])), int(np.round(r["mean"])), step=step)
+    input_vals[col] = val
 
 st.sidebar.markdown("---")
+if st.sidebar.button("🎯 Predecir Potencial"):
+    # construir df usuario
+    df_user = pd.DataFrame([input_vals])
+    predicted_label = None
+    method_used = None
 
-# Detener ejecución si no hay datos
-if df_nba.empty:
-    st.info("La interfaz de análisis avanzado (EDA, Clustering y Regresión) se activará una vez que se cargue un dataset válido.")
-    st.stop()
-    
-# ============================
-# 1. EDA INTERACTIVO (Gráficos Ajustados)
-# ============================
+    # 1) intentar usar clasificador entrenado
+    if classifier is not None and scaler is not None:
+        try:
+            Xusr = scaler.transform(df_user[FEATURES_REG])
+            pred = classifier.predict(Xusr)[0]
+            predicted_label = "Tiene potencial" if int(pred) == 1 else "No tiene potencial"
+            method_used = "Clasificador (Logistic)"
+        except Exception as e:
+            predicted_label = None
 
-st.header("📊 Exploración de Datos (EDA)")
+    # 2) si no hay clasificador, intentar usar regresión: entrenar regresión simple y comparar con umbral
+    if predicted_label is None:
+        # si existe global_score en df_nba entreno regresión simple
+        if TARGET in df_nba.columns and all([c in df_nba.columns for c in FEATURES_REG]):
+            try:
+                df_reg = df_nba.dropna(subset=FEATURES_REG + [TARGET])
+                if not df_reg.empty:
+                    X = df_reg[FEATURES_REG]
+                    y = df_reg[TARGET]
+                    reg = LinearRegression()
+                    reg.fit(X, y)
+                    yhat = reg.predict(df_user[FEATURES_REG])[0]
+                    if potential_threshold is not None:
+                        predicted_label = "Tiene potencial" if yhat >= potential_threshold else "No tiene potencial"
+                        method_used = "Regresión -> umbral (percentil 75)"
+                    else:
+                        # fallback heuristic: arriba de la media
+                        med = df_reg[TARGET].median()
+                        predicted_label = "Tiene potencial" if yhat >= med else "No tiene potencial"
+                        method_used = "Regresión -> umbral (media)"
+            except Exception as e:
+                predicted_label = None
 
-col1, col2, col3 = st.columns([1, 1, 1])
+    # 3) heurística final: usar ts_pct_score y usg_pct_score simple rule (ejemplo)
+    if predicted_label is None:
+        ts = input_vals.get("ts_pct_score", 0)
+        usg = input_vals.get("usg_pct_score", 0)
+        # heurística simple: alta eficiencia y moderado-alto uso -> potencial
+        if ts >= 0.58 and usg >= 0.2:
+            predicted_label = "Tiene potencial"
+        else:
+            predicted_label = "No tiene potencial"
+        method_used = "Heurística simple"
 
-numeric_cols = df_nba.select_dtypes(include=['number']).columns
-all_cols = df_nba.columns
-
-# Filtrar las opciones para incluir solo Scatterplot, Barra y Línea, más Histograma
-graph_options = ["Histograma", "Gráfico de dispersión (Scatterplot)", "Gráfico de barras", "Gráfico de línea"]
-
-with col1:
-    graph_type = st.selectbox(
-        "Tipo de gráfico:",
-        graph_options,
-        key="eda_type"
+    # Mostrar resultado
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(
+        f"""
+        <div style='text-align:center; padding:10px; border-radius:8px; background:{COLOR_1};'>
+            <p style='margin:0; color:white;'>Resultado</p>
+            <h2 style='margin:0; color:{COLOR_ACCENT};'>{predicted_label}</h2>
+            <small style='color:white;'>Método: {method_used}</small>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-with col2:
-    if graph_type == "Histograma":
-        col_x = st.selectbox("Variable (Numérica/Continua):", numeric_cols, key="col_hist")
-    elif graph_type in ["Gráfico de dispersión (Scatterplot)", "Gráfico de línea"]:
-        col_x = st.selectbox("Variable X (Numérica/Continua):", numeric_cols, key="col_x_cont")
-    elif graph_type == "Gráfico de barras":
-        col_x = st.selectbox("Variable X (Categórica/Agrupación):", all_cols, key="col_x_bar")
-    else:
-        col_x = None
+st.sidebar.markdown("---")
+st.sidebar.write("Umbral de potencial (percentil 75) calculado a partir del dataset cargado: ")
+st.sidebar.write(f"**{potential_threshold:.4f}**" if potential_threshold is not None else "N/A")
 
-with col3:
-    if graph_type in ["Gráfico de dispersión (Scatterplot)", "Gráfico de línea"]:
-        col_y = st.selectbox("Variable Y (Numérica/Continua):", numeric_cols, key="col_y_cont")
-    elif graph_type == "Gráfico de barras":
-        col_y = st.selectbox("Métrica Y (Recuento o Numérica):", all_cols, key="col_y_bar")
-    else:
-        col_y = None
+# ============================
+# MAIN: EDA (Barras, Línea, Scatter)
+# ============================
+st.header("📊 Exploración de Datos (EDA) — Barras / Línea / Scatter")
 
+# Opciones de columna para UI
+numeric_cols = df_nba.select_dtypes(include=['number']).columns.tolist() if not df_nba.empty else []
+all_cols = df_nba.columns.tolist() if not df_nba.empty else []
 
-# GENERADOR DE GRÁFICOS
-if col_x is not None:
-    st.write("### Visualización Generada")
+colA, colB, colC = st.columns([1,1,1])
+with colA:
+    chart_type = st.selectbox("Tipo de gráfico:", ["Barra", "Línea", "Scatterplot"])
+with colB:
+    if chart_type in ["Barra"]:
+        x_col = st.selectbox("Eje X (categórico o agrupación):", all_cols)
+        y_col = st.selectbox("Eje Y (numérica/agrupación):", numeric_cols)
+    elif chart_type in ["Línea",]:
+        x_col = st.selectbox("Eje X (numérica/ordenable):", numeric_cols)
+        y_col = st.selectbox("Eje Y (numérica):", numeric_cols, index=0)
+    else:  # Scatter
+        x_col = st.selectbox("Eje X (numérica):", numeric_cols)
+        y_col = st.selectbox("Eje Y (numérica):", numeric_cols, index=1 if len(numeric_cols)>1 else 0)
+with colC:
+    groupby_col = st.selectbox("Color / Agrupar por (opcional):", [None] + all_cols, index=0)
+
+# Generar gráfico
+if x_col and y_col:
     try:
-        fig, ax = plt.subplots()
-        # Configuración de estilo global para el plot (fuentes blancas)
-        ax.set_facecolor(COLOR_BG)
-        fig.patch.set_facecolor(COLOR_BG)
-        plt.rcParams['text.color'] = 'white'
-        plt.rcParams['axes.labelcolor'] = 'white'
-        plt.rcParams['xtick.color'] = 'white'
-        plt.rcParams['ytick.color'] = 'white'
-
-        if graph_type == "Histograma":
-            if df_nba[col_x].dtype in ['int64', 'float64']:
-                sns.histplot(df_nba[col_x].dropna(), kde=True, color=COLOR_ACCENT, ax=ax)
-                ax.set_title(f"Distribución de {col_x}", color=COLOR_3)
-            else:
-                 st.warning(f"'{col_x}' no es una variable numérica para Histograma.")
-
-        elif graph_type == "Gráfico de dispersión (Scatterplot)" and col_y is not None:
-            if df_nba[col_x].dtype in ['int64', 'float64'] and df_nba[col_y].dtype in ['int64', 'float64']:
-                sns.scatterplot(data=df_nba.dropna(subset=[col_x, col_y]), x=col_x, y=col_y, color=COLOR_1, s=50, ax=ax)
-                ax.set_title(f"Dispersión: {col_y} vs {col_x}", color=COLOR_3)
-            else:
-                 st.warning("Ambas variables para Scatterplot deben ser numéricas.")
-
-        elif graph_type == "Gráfico de barras" and col_y is not None:
-            if df_nba[col_y].dtype in ['int64', 'float64']:
-                grouped_data = df_nba.groupby(col_x)[col_y].mean().reset_index()
-                y_label = f"Media de {col_y}"
-            else:
-                grouped_data = df_nba[col_x].value_counts().reset_index()
-                grouped_data.columns = [col_x, 'Conteo']
-                col_y = 'Conteo'
-                y_label = 'Conteo'
-
-            y_col_name = col_y if 'Conteo' in grouped_data.columns else grouped_data.columns[-1]
-
-            sns.barplot(data=grouped_data, x=col_x, y=y_col_name, palette="crest", ax=ax)
-            ax.set_title(f"Gráfico de Barras por {col_x}", color=COLOR_3)
-            ax.set_ylabel(y_label)
-            ax.tick_params(axis='x', rotation=45)
-            plt.tight_layout()
-
-        elif graph_type == "Gráfico de línea" and col_y is not None:
-            if df_nba[col_x].dtype in ['int64', 'float64'] and df_nba[col_y].dtype in ['int64', 'float64']:
-                sns.lineplot(data=df_nba.dropna(subset=[col_x, col_y]), x=col_x, y=col_y, color=COLOR_2, ax=ax)
-                ax.set_title(f"Gráfico de Línea: {col_y} vs {col_x}", color=COLOR_3)
-            else:
-                 st.warning("Ambas variables para Gráfico de Línea deben ser numéricas.")
-
-        # Ajuste final de estilos para el borde
-        ax.spines['left'].set_color('white')
-        ax.spines['bottom'].set_color('white')
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        
-        st.pyplot(fig)
-
-    except Exception as e:
-        st.error(f"Error al generar el gráfico. Verifica la selección de columnas: {e}")
-
-# ============================
-# 2. CLUSTERING KMEANS
-# ============================
-
-st.header("🎯 Clustering de Jugadores (Rendimiento)")
-
-try:
-    if not all(col in df_nba.columns for col in FEATURES_CLUSTER):
-        st.warning(f"Omitiendo Clustering: Faltan columnas necesarias ({', '.join([col for col in FEATURES_CLUSTER if col not in df_nba.columns])}).")
-    else:
-        df_cluster_data = df_nba.dropna(subset=FEATURES_CLUSTER).copy()
-        
-        if df_cluster_data.empty:
-            st.warning("No hay datos suficientes para realizar Clustering después de limpiar NaNs.")
-        else:
-            X_cluster = df_cluster_data[FEATURES_CLUSTER]
-            scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X_cluster)
-
-            kmeans = KMeans(n_clusters=4, random_state=42, n_init='auto')
-            df_cluster_data["cluster"] = kmeans.fit_predict(X_scaled)
-
-            df_nba = df_nba.merge(
-                df_cluster_data[['cluster']], 
-                left_index=True, 
-                right_index=True, 
-                how='left'
-            )
-            
-            st.write("### Centros de cada cluster (Valores Estandarizados)")
-            st.dataframe(pd.DataFrame(kmeans.cluster_centers_, columns=FEATURES_CLUSTER))
-
-            summary = df_cluster_data.groupby("cluster")[FEATURES_CLUSTER].mean()
-            dominant_feature = summary.idxmax(axis=1)
-
-            interpretation_map = {
-                "ts_pct_score": "Bajo uso, alta eficiencia",
-                "dreb_pct_score": "Alto rebote defensivo",
-                "ast_pct_score": "Creador de juego (AST)",
-                "usg_pct_score": "Anotador de alto volumen",
-                "net_rating_score": "Jugador de impacto neto positivo",
-                "oreb_pct_score": "Alto rebote ofensivo"
-            }
-
-            df_nba["cluster_label"] = df_nba["cluster"].map(dominant_feature.map(interpretation_map)).fillna("N/A")
-
-            st.write("### Jugadores de Ejemplo por Cluster")
-            st.dataframe(df_nba[["player_name", "cluster", "cluster_label"]].sort_values('cluster').head(20))
-    
-except Exception as e:
-    st.error(f"Error en el proceso de Clustering: {e}")
-
-# ============================
-# 3. REGRESIÓN / PREDICCIÓN DE RENDIMIENTO
-# ============================
-
-st.header("📈 Modelo Predictivo – Regresión del Rendimiento")
-
-if model is None:
-    st.warning("El modelo de Regresión no se pudo entrenar. Verifica las columnas de tu dataset.")
-else:
-    try:
-        y_data = df_nba.dropna(subset=[TARGET] + FEATURES_REG)
-        y = y_data[TARGET]
-        X_data = y_data[FEATURES_REG]
-        y_pred = model.predict(X_data) 
-
-        mae = mean_absolute_error(y, y_pred)
-        r2 = r2_score(y, y_pred)
-
-        col_metrica1, col_metrica2 = st.columns(2)
-        with col_metrica1:
-            st.metric(label="Error Absoluto Medio (MAE)", value=f"{mae:.4f}")
-        with col_metrica2:
-            st.metric(label="Coeficiente de Determinación (R²)", value=f"{r2:.4f}")
-
-        # Coeficientes del modelo
-        coef_df = pd.DataFrame({
-            "Variable": FEATURES_REG,
-            "Importancia": model.coef_
-        }).sort_values("Importancia", ascending=False)
-
-        st.write("### Importancia de variables (Coeficientes)")
-        st.dataframe(coef_df)
-        
-        # Gráfico de Importancia
         fig, ax = plt.subplots(figsize=(8,5))
-        ax.set_facecolor(COLOR_BG)
         fig.patch.set_facecolor(COLOR_BG)
+        ax.set_facecolor(COLOR_BG)
+        plt.rcParams.update({'text.color':'white','axes.labelcolor':'white','xtick.color':'white','ytick.color':'white'})
 
-        sns.barplot(data=coef_df, x="Importancia", y="Variable", palette="coolwarm", ax=ax)
-        ax.set_title("Importancia de Variables en la Predicción", color=COLOR_3)
-        ax.set_xlabel("Coeficiente (Impacto en Global Score)")
-        ax.set_ylabel("Variable")
-        
-        # Ajustar color de ticks y bordes
-        ax.tick_params(colors='white')
+        if chart_type == "Barra":
+            # si y_col es numérico y x_col es categórico -> promedio
+            if x_col in df_nba.columns and y_col in df_nba.columns:
+                grouping = df_nba.groupby(x_col)[y_col].mean().reset_index()
+                sns.barplot(data=grouping, x=x_col, y=y_col, ax=ax, palette="crest")
+                ax.set_title(f"Media de {y_col} por {x_col}", color=COLOR_3)
+                plt.xticks(rotation=45, ha="right")
+            else:
+                st.warning("Columnas inválidas para gráfico de barras.")
+        elif chart_type == "Línea":
+            # ordenar por x_col y plot
+            temp = df_nba[[x_col,y_col]].dropna().sort_values(by=x_col)
+            sns.lineplot(data=temp, x=x_col, y=y_col, ax=ax)
+            ax.set_title(f"{y_col} vs {x_col} (línea)", color=COLOR_3)
+        else:  # Scatter
+            if groupby_col and groupby_col in df_nba.columns:
+                sns.scatterplot(data=df_nba.dropna(subset=[x_col,y_col]), x=x_col, y=y_col, hue=groupby_col, ax=ax, palette="viridis")
+            else:
+                sns.scatterplot(data=df_nba.dropna(subset=[x_col,y_col]), x=x_col, y=y_col, ax=ax, color=COLOR_ACCENT)
+            ax.set_title(f"Scatter: {y_col} vs {x_col}", color=COLOR_3)
+
+        # estilo
         ax.spines['left'].set_color('white')
         ax.spines['bottom'].set_color('white')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-
         st.pyplot(fig)
-
-
     except Exception as e:
-        st.error(f"Error al evaluar el modelo de Regresión: {e}")
+        st.error(f"Error generando gráfico: {e}")
+else:
+    st.info("Seleccioná X y Y para generar el gráfico.")
 
+st.markdown("---")
 
 # ============================
-# 4. TOP 10 JUGADORES
+# TOP 10 Jugadores (si existen columnas)
 # ============================
-
-st.header("🏆 Top 10 jugadores por rendimiento global")
-
-try:
-    if "player_name" in df_nba.columns and "team_abbreviation" in df_nba.columns and TARGET in df_nba.columns:
-        top10 = (
-            df_nba.sort_values(TARGET, ascending=False)
-                .head(10)[["player_name","team_abbreviation",TARGET]]
-        )
-
+st.header("🏆 Top 10 jugadores por Global Score (si aplica)")
+if not df_nba.empty and "player_name" in df_nba.columns and TARGET in df_nba.columns:
+    try:
+        top10 = df_nba.sort_values(TARGET, ascending=False).head(10)[["player_name","team_abbreviation",TARGET]].drop_duplicates()
         st.table(top10)
-
         fig, ax = plt.subplots(figsize=(8,5))
-        ax.set_facecolor(COLOR_BG)
         fig.patch.set_facecolor(COLOR_BG)
-        
-        sns.barplot(data=top10, y="player_name", x=TARGET, palette="crest", ax=ax)
-        plt.title("Top 10 jugadores (Global Score)", color=COLOR_3)
-        ax.set_xlabel("Global Score")
-        ax.set_ylabel("Jugador")
-        
+        ax.set_facecolor(COLOR_BG)
+        sns.barplot(data=top10, y="player_name", x=TARGET, ax=ax, palette="crest")
+        ax.set_title("Top 10 jugadores (Global Score)", color=COLOR_3)
         ax.tick_params(colors='white')
-        ax.spines['left'].set_color('white')
-        ax.spines['bottom'].set_color('white')
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        
         st.pyplot(fig)
-    else:
-        st.warning(f"No se pudo generar el Top 10: Faltan columnas clave ('player_name', 'team_abbreviation' o '{TARGET}').")
-    
-except Exception as e:
-    st.error(f"Error al generar el Top 10: {e}")
-
-# ============================
-# 5. DESCARGA DE RESULTADOS
-# ============================
-
-st.header("💾 Descarga")
-
-if "cluster_label" in df_nba.columns:
-    df_download = df_nba.drop(columns=['cluster_label'], errors='ignore')
+    except Exception as e:
+        st.error(f"No se pudo generar Top 10: {e}")
 else:
-    df_download = df_nba
-    
-st.download_button(
-    "📥 Descargar Dataset Modificado (con Clusters)",
-    df_download.to_csv(index=False).encode('utf-8'),
-    "nba_processed_with_clusters.csv",
-    "text/csv"
-)
+    st.info("Faltan columnas 'player_name' o 'global_score' para generar Top 10.")
+
+# ============================
+# DESCARGA
+# ============================
+st.markdown("---")
+st.header("💾 Descarga")
+if not df_nba.empty:
+    st.download_button("📥 Descargar dataset principal (csv)", df_nba.to_csv(index=False).encode('utf-8'), "nba_principal.csv", "text/csv")
+else:
+    st.info("No hay dataset principal para descargar.")
+
+st.caption("App generada a partir del repositorio: https://github.com/MelRossi/App-rendimiento-nba")
+
