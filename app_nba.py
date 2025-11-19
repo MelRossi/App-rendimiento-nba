@@ -277,71 +277,137 @@ st.markdown('</div>', unsafe_allow_html=True)
 st.markdown("---")
 
 # ======================================================
-# 6. TOP 10 GLOBAL SCORE (si aplica)
+# 6. TOP 10 GLOBAL SCORE (USANDO SIEMPRE nba_puntaje_vara.csv)
 # ======================================================
 
-if TARGET in df_nba.columns:
-    st.header("🏆 Top 10 jugadores por Global Score")
-    try:
-        top10 = df_nba.sort_values(TARGET, ascending=False).head(10)
-        st.table(top10[["player_name","team_abbreviation",TARGET]])
+st.header("🏆 Top 10 jugadores por Global Score")
 
-    except:
-        st.info("No se puede generar Top 10.")
+df_model = dfs_default["puntaje"].copy()   # ← SIEMPRE trabajar con este
+if not df_model.empty and "global_score" in df_model.columns:
+    try:
+        top10 = (
+            df_model.sort_values("global_score", ascending=False)
+                    .head(10)[["player_name","team_abbreviation","global_score"]]
+        )
+        st.table(top10)
+
+        fig, ax = plt.subplots(figsize=(8,5))
+        fig.patch.set_facecolor(COLOR_BG)
+        ax.set_facecolor(COLOR_BG)
+
+        sns.barplot(data=top10, y="player_name", x="global_score", palette="crest", ax=ax)
+        ax.set_title("Top 10 jugadores (Global Score)", color=COLOR_3)
+        ax.tick_params(colors='white')
+
+        st.markdown('<div class="plot-container">', unsafe_allow_html=True)
+        st.pyplot(fig)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    except Exception as e:
+        st.error(f"Error generando Top 10: {e}")
+else:
+    st.info("El archivo de puntaje no contiene 'global_score'.")
 
 st.markdown("---")
 
+
 # ======================================================
-# 7. RANDOM FOREST — REGRESIÓN
+# 7. RANDOM FOREST (SIEMPRE SOBRE nba_puntaje_vara.csv)
 # ======================================================
 
 st.header("📈 Modelo Predictivo — RandomForestRegressor")
 
-req = ['age','player_height','player_weight',
-       'oreb_pct_score','dreb_pct_score','usg_pct_score',
-       'ts_pct_score','ast_pct_score']
+req = [
+    'age','player_height','player_weight',
+    'oreb_pct_score','dreb_pct_score','usg_pct_score',
+    'ts_pct_score','ast_pct_score'
+]
 
-if all([c in df_nba.columns for c in req]) and TARGET in df_nba.columns:
-    dfr = df_nba.dropna(subset=req+[TARGET])
-    if dfr.shape[0] >= 30:
-        X = dfr[req]
-        y = dfr[TARGET]
-        Xtr,Xte,ytr,yte = train_test_split(X,y,test_size=0.2,random_state=42)
+if all([c in df_model.columns for c in req + ["global_score"]]):
+    df_rf = df_model.dropna(subset=req + ["global_score"])
+    if df_rf.shape[0] >= 30:
+
+        X = df_rf[req]
+        y = df_rf["global_score"]
+
+        Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=42)
+
         rf = RandomForestRegressor(n_estimators=300, random_state=42)
-        rf.fit(Xtr,ytr)
+        rf.fit(Xtr, ytr)
+
         ypred = rf.predict(Xte)
-        colA,colB = st.columns(2)
-        colA.metric("MAE", f"{mean_absolute_error(yte,ypred):.4f}")
-        colB.metric("R²", f"{r2_score(yte,ypred):.4f}")
+
+        colA, colB = st.columns(2)
+        colA.metric("MAE", f"{mean_absolute_error(yte, ypred):.4f}")
+        colB.metric("R²", f"{r2_score(yte, ypred):.4f}")
+
+        importancia = pd.Series(rf.feature_importances_, index=req).sort_values()
+
+        st.write("### Importancia de variables")
+        fig, ax = plt.subplots(figsize=(7,5))
+        fig.patch.set_facecolor(COLOR_BG)
+        ax.set_facecolor(COLOR_BG)
+        importancia.plot(kind='barh', ax=ax, color=COLOR_ACCENT)
+        ax.tick_params(colors='white')
+
+        st.markdown('<div class="plot-container">', unsafe_allow_html=True)
+        st.pyplot(fig)
+        st.markdown('</div>', unsafe_allow_html=True)
+
     else:
-        st.info("No hay suficientes datos limpios para entrenar RandomForest.")
+        st.info("El dataset de puntaje no tiene suficientes filas limpias para entrenar RandomForest.")
 else:
-    st.info("Faltan columnas necesarias para la regresión.")
+    st.info("El archivo de puntaje no contiene todas las columnas necesarias.")
 
 st.markdown("---")
 
+
 # ======================================================
-# 8. KMEANS — CLUSTERING
+# 8. KMEANS (SIEMPRE SOBRE nba_puntaje_vara.csv)
 # ======================================================
 
 st.header("🎯 Clustering KMeans (6 features)")
 
-cluster_cols = ['ts_pct_score','usg_pct_score','ast_pct_score',
-                'oreb_pct_score','dreb_pct_score','net_rating_score']
+cluster_cols = [
+    'ts_pct_score','usg_pct_score','ast_pct_score',
+    'oreb_pct_score','dreb_pct_score','net_rating_score'
+]
 
-if all([c in df_nba.columns for c in cluster_cols]):
-    dfc = df_nba.dropna(subset=cluster_cols)
+if all([c in df_model.columns for c in cluster_cols]):
+    dfc = df_model.dropna(subset=cluster_cols)
     if dfc.shape[0] >= 20:
         scaler = StandardScaler()
         Xsc = scaler.fit_transform(dfc[cluster_cols])
-        km = KMeans(n_clusters=4, random_state=42, n_init=10)
-        dfc["cluster"] = km.fit_predict(Xsc)
-        st.write("Centros del cluster (estandarizados):")
-        st.dataframe(pd.DataFrame(km.cluster_centers_, columns=cluster_cols))
+
+        kmeans = KMeans(n_clusters=4, random_state=42, n_init=10)
+        dfc["cluster"] = kmeans.fit_predict(Xsc)
+
+        st.write("### Centros del cluster (estandarizados)")
+        st.dataframe(pd.DataFrame(kmeans.cluster_centers_, columns=cluster_cols))
+
+        summary = dfc.groupby("cluster")[cluster_cols].mean()
+        dominant = summary.idxmax(axis=1)
+
+        interpretacion = {
+            'ts_pct_score': 'Bajo uso, alta eficiencia',
+            'dreb_pct_score': 'Alto rebote defensivo',
+            'ast_pct_score': 'Creador de juego',
+            'usg_pct_score': 'Anotador de alto volumen',
+            'net_rating_score': 'Impacto neto positivo',
+            'oreb_pct_score': 'Rebote ofensivo'
+        }
+
+        labels = dominant.map(interpretacion).fillna("—")
+        st.write("### Etiquetas interpretativas")
+        st.table(labels)
+
     else:
-        st.info("No hay suficientes filas para clustering.")
+        st.info("No hay suficientes filas en nba_puntaje_vara.csv para clustering.")
+else:
+    st.info("El archivo de puntaje no contiene las columnas necesarias para clustering.")
 
 st.markdown("---")
+
 
 # ======================================================
 # 9. DESCARGA FINAL
@@ -354,3 +420,4 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
