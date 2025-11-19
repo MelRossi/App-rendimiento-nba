@@ -107,11 +107,9 @@ uploaded = st.file_uploader("📂 Subir archivo CSV (opcional) para reemplazar d
 if uploaded:
     df_uploaded = pd.read_csv(uploaded)
     df_base = df_uploaded.copy()
-    data_source = f"Archivo subido: {uploaded.name}"
     st.success(f"Archivo cargado correctamente: {uploaded.name}")
 else:
     df_base = None
-    data_source = "Archivos por defecto"
     st.info("Archivos por defecto: cargados correctamente.")
 
 st.markdown("---")
@@ -151,7 +149,6 @@ st.markdown("---")
 # ======================================================
 
 TARGET = "global_score"
-
 FEATURES = [
     "ts_pct_score","usg_pct_score","dreb_pct_score","ast_pct_score",
     "oreb_pct_score","age","player_height","player_weight"
@@ -198,7 +195,7 @@ DEFAULT_R = {
 
 input_vals = {}
 for col in FEATURES:
-    vmin,vmax,vmean = DEFAULT_R[col]
+    vmin, vmax, vmean = DEFAULT_R[col]
     if col in df_nba.columns:
         try:
             vmin = float(df_nba[col].min())
@@ -206,6 +203,7 @@ for col in FEATURES:
             vmean = float(df_nba[col].median())
         except:
             pass
+
     if col in ["age","player_height","player_weight"]:
         input_vals[col] = st.sidebar.slider(col, int(vmin), int(vmax), int(vmean))
     else:
@@ -230,7 +228,10 @@ if st.sidebar.button("🔮 Predecir"):
 # 5. EDA — BARRA / LÍNEA / SCATTER
 # ======================================================
 
-st.header("📊 Exploración de Datos (EDA)")
+st.markdown(
+    f"<h2 style='color:{COLOR_ACCENT}; font-weight:700;'>📊 Exploración de Datos (EDA)</h2>",
+    unsafe_allow_html=True
+)
 
 num_cols = df_nba.select_dtypes(include=['number']).columns.tolist()
 all_cols = df_nba.columns.tolist()
@@ -277,12 +278,16 @@ st.markdown('</div>', unsafe_allow_html=True)
 st.markdown("---")
 
 # ======================================================
-# 6. TOP 10 GLOBAL SCORE (USANDO SIEMPRE nba_puntaje_vara.csv)
+# 6. TOP 10 GLOBAL SCORE (SIEMPRE SOBRE nba_puntaje_vara.csv)
 # ======================================================
 
-st.header("🏆 Top 10 jugadores por Global Score")
+st.markdown(
+    f"<h2 style='color:{COLOR_ACCENT}; font-weight:700;'>🏆 Top 10 jugadores por Global Score</h2>",
+    unsafe_allow_html=True
+)
 
-df_model = dfs_default["puntaje"].copy()   # ← SIEMPRE trabajar con este
+df_model = dfs_default["puntaje"].copy()  # <-- SIEMPRE ESTE
+
 if not df_model.empty and "global_score" in df_model.columns:
     try:
         top10 = (
@@ -310,12 +315,14 @@ else:
 
 st.markdown("---")
 
-
 # ======================================================
 # 7. RANDOM FOREST (SIEMPRE SOBRE nba_puntaje_vara.csv)
 # ======================================================
 
-st.header("📈 Modelo Predictivo — RandomForestRegressor")
+st.markdown(
+    f"<h2 style='color:{COLOR_ACCENT}; font-weight:700;'>📈 Modelo Predictivo — RandomForestRegressor</h2>",
+    unsafe_allow_html=True
+)
 
 req = [
     'age','player_height','player_weight',
@@ -361,12 +368,14 @@ else:
 
 st.markdown("---")
 
-
 # ======================================================
 # 8. KMEANS (SIEMPRE SOBRE nba_puntaje_vara.csv)
 # ======================================================
 
-st.header("🎯 Clustering KMeans (6 features)")
+st.markdown(
+    f"<h2 style='color:{COLOR_ACCENT}; font-weight:700;'>🎯 Clustering KMeans (6 features)</h2>",
+    unsafe_allow_html=True
+)
 
 cluster_cols = [
     'ts_pct_score','usg_pct_score','ast_pct_score',
@@ -408,16 +417,18 @@ else:
 
 st.markdown("---")
 
-
 # ======================================================
 # 9. DESCARGA FINAL
 # ======================================================
 
-st.header("💾 Descargar dataset")
+st.markdown(
+    f"<h2 style='color:{COLOR_ACCENT}; font-weight:700;'>💾 Descargar dataset</h2>",
+    unsafe_allow_html=True
+)
+
 st.download_button(
     "Descargar CSV",
     df_nba.to_csv(index=False).encode("utf-8"),
     "dataset_procesado.csv",
     "text/csv"
 )
-
