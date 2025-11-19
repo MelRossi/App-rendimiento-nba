@@ -311,7 +311,7 @@ st.markdown("---")
 # ======================================================
 
 st.markdown(
-    f"<h2 style='color:{COLOR_ACCENT}; font-weight:700;'>🏆 Top 10 jugadores por "Global Score"</h2>",
+    f"<h2 style='color:{COLOR_ACCENT}; font-weight:700;'>🏆 Top 10 jugadores por Global Score</h2>",
     unsafe_allow_html=True
 )
 
@@ -496,6 +496,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
