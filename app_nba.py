@@ -244,9 +244,16 @@ with col_preview_1:
     num_rows = st.slider("Filas a mostrar", 5, 30, 5)
 
 with col_preview_2:
-    st.write("Mostrando las primeras filas del dataframe:")
+    st.write("Mostrando primeras filas del dataset:")
 
 st.dataframe(df_nba.head(num_rows), use_container_width=True)
+
+# -------- Resumen estadístico --------
+with st.expander("📊 Mostrar resumen estadístico (describe())"):
+    try:
+        st.dataframe(df_nba.describe().T, use_container_width=True)
+    except:
+        st.info("No se puede generar un resumen estadístico para este dataset.")
 
 st.markdown("---")
 
@@ -489,6 +496,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
