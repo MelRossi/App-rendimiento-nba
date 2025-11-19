@@ -495,8 +495,6 @@ if all([c in df_model.columns for c in cluster_cols]):
 else:
     st.info("El archivo de puntaje no contiene las columnas necesarias para clustering.")
 
-st.markdown("---")
-
 # ========= CONCLUSIÓN AUTOMÁTICA DEL CLUSTERING =========
 
 st.markdown(
@@ -547,6 +545,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
