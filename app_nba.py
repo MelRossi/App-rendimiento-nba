@@ -417,6 +417,41 @@ else:
 
 st.markdown("---")
 
+# ========= CONCLUSIÓN AUTOMÁTICA DEL CLUSTERING =========
+
+st.markdown(
+    f"<h3 style='color:{COLOR_ACCENT}; margin-top:25px;'>📌 Conclusión del análisis de Clustering</h3>",
+    unsafe_allow_html=True
+)
+
+conclusion_text = """
+El análisis de clustering permitió identificar **4 perfiles claros de jugadores**, basados en 
+sus métricas avanzadas de eficiencia, uso, creación de juego y rebote:
+
+- **Cluster 0 – Creador de juego:** jugadores con fuerte aporte en asistencias y generación de ofensiva para el equipo.
+- **Cluster 1 – Rebote ofensivo:** perfiles que destacan cerca del aro, recuperando posesiones y aportando en segundas oportunidades.
+- **Cluster 2 – Rebote ofensivo (perfil similar al cluster 1):** aunque con ligeras diferencias en uso y eficiencia, este grupo también se caracteriza por su impacto en el rebote en ataque.
+- **Cluster 3 – Impacto neto positivo:** jugadores que influyen directamente en el rendimiento global del equipo, combinando eficiencia y aporte en ambos lados de la cancha.
+
+En conjunto, este modelo permite segmentar el estilo de contribución de los jugadores, ayudando a visualizar 
+qué tipo de rol tienen y cómo se diferencian dentro del rendimiento general de la liga.
+"""
+
+st.markdown(
+    f"""
+    <div style="
+        background-color:{COLOR_1};
+        padding:18px;
+        border-radius:12px;
+        color:white;
+        line-height:1.6;
+    ">
+        {conclusion_text}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 # ======================================================
 # 9. DESCARGA FINAL
 # ======================================================
@@ -432,3 +467,4 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
