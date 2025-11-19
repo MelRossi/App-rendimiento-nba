@@ -469,11 +469,11 @@ st.markdown(
         line-height:1.6;
     ">
         {conclusion_text}
-    </div>
     """,
     unsafe_allow_html=True
 )
 
+st.markdown("---")
 # ======================================================
 # 9. DESCARGA FINAL
 # ======================================================
@@ -489,5 +489,6 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
