@@ -72,7 +72,7 @@ st.markdown(
 # 1. CARGA DE DATOS (pantalla principal)
 # ======================================================
 
-st.markdown("<div class='title'>🏀 NBA Performance Analytics</div>", unsafe_allow_html=True)
+st.markdown("<div class='title'>🏀 NBA Análisis de Rendimiento</div>", unsafe_allow_html=True)
 st.markdown("<div class='subtitle'>EDA, Clustering y Modelos de Predicción</div>", unsafe_allow_html=True)
 st.markdown("---")
 
@@ -140,7 +140,7 @@ if choice == "Archivo subido":
 else:
     df_nba = dfs_default[opciones[choice]].copy()
 
-st.success(f"📊 Dataset seleccionado: {choice} — {df_nba.shape[0]:,} filas")
+st.success(f"Dataset seleccionado: {choice} — {df_nba.shape[0]:,} filas")
 
 st.markdown("---")
 
@@ -209,7 +209,7 @@ for col in FEATURES:
     else:
         input_vals[col] = st.sidebar.slider(col, float(vmin), float(vmax), float(vmean), step=0.01)
 
-if st.sidebar.button("🔮 Predecir"):
+if st.sidebar.button("Predecir"):
     user_df = pd.DataFrame([input_vals])
     method = ""
     if classifier is not None:
@@ -249,7 +249,7 @@ with col_preview_2:
 st.dataframe(df_nba.head(num_rows), use_container_width=True)
 
 # -------- Resumen estadístico --------
-with st.expander("📊 Mostrar resumen estadístico (describe())"):
+with st.expander("Mostrar resumen estadístico"):
     try:
         st.dataframe(df_nba.describe().T, use_container_width=True)
     except:
@@ -311,7 +311,7 @@ st.markdown("---")
 # ======================================================
 
 st.markdown(
-    f"<h2 style='color:{COLOR_ACCENT}; font-weight:700;'>🏆 Top 10 jugadores por Global Score</h2>",
+    f"<h2 style='color:{COLOR_ACCENT}; font-weight:700;'>🏆 Top 10 jugadores por "Global Score"</h2>",
     unsafe_allow_html=True
 )
 
@@ -402,7 +402,7 @@ st.markdown("---")
 # ======================================================
 
 st.markdown(
-    f"<h2 style='color:{COLOR_ACCENT}; font-weight:700;'>🎯 Clustering KMeans (6 features)</h2>",
+    f"<h2 style='color:{COLOR_ACCENT}; font-weight:700;'>🎯 Clustering K-Means</h2>",
     unsafe_allow_html=True
 )
 
@@ -496,6 +496,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
