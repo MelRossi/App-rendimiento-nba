@@ -97,7 +97,8 @@ with col1:
         else:
             st.warning(m)
 with col2:
-    st.image("Image_logo.png" if 'Image_logo.png' in st.file_uploader else None, width=100)  # si existe en local del repo
+    st.image("https://raw.githubusercontent.com/MelRossi/App-rendimiento-nba/main/Image_logo.png", width=120)
+
 
 # Referencia principal: dataframe de puntaje (tu 'nba_puntaje_vara.csv')
 df_nba = dfs.get("puntaje", pd.DataFrame())
@@ -183,10 +184,13 @@ st.markdown("---")
 # ============================
 # SIDEBAR: PREDICCIÓN MANUAL (sliders numéricos)
 # ============================
-st.sidebar.markdown(f"<h3 style='color:{COLOR_ACCENT};'>🚀 Predicción de Potencial (Manual)</h3>", unsafe_allow_html=True)
+st.sidebar.markdown(
+    f"<h3 style='color:{COLOR_ACCENT};'>🚀 Predicción de Potencial (Manual)</h3>",
+    unsafe_allow_html=True
+)
 st.sidebar.write("Introduce valores numéricos para el jugador. Luego presiona 'Predecir'.")
 
-# Determinar rangos dinámicos a partir de df_nba o default
+# Determinar rangos dinámicos a partir de df_nba o usar default
 DEFAULT_RANGES = {
     "ts_pct_score": {"min": 0.0, "max": 1.0, "mean": 0.5},
     "usg_pct_score": {"min": 0.0, "max": 1.0, "mean": 0.25},
@@ -207,91 +211,83 @@ for col in FEATURES_REG:
                 "max": float(df_nba[col].max()),
                 "mean": float(df_nba[col].median())
             }
-        except Exception:
-            rangos[col] = DEFAULT_RANGES.get(col, {"min":0,"max":1,"mean":0.5})
+        except:
+            rangos[col] = DEFAULT_RANGES[col]
     else:
-        rangos[col] = DEFAULT_RANGES.get(col, {"min":0,"max":1,"mean":0.5})
+        rangos[col] = DEFAULT_RANGES[col]
 
 # Crear sliders
 input_vals = {}
 for col in FEATURES_REG:
     r = rangos[col]
     if 'score' in col or 'pct' in col:
-        step = 0.01
-        fmt = "%.2f"
-        val = st.sidebar.slider(f"{col}", float(r["min"]), float(r["max"]), float(r["mean"]), step=step, format=fmt)
+        val = st.sidebar.slider(
+            f"{col}",
+            float(r["min"]), float(r["max"]),
+            float(r["mean"]), step=0.01, format="%.2f"
+        )
     else:
-        step = 1
-        val = st.sidebar.slider(f"{col}", int(np.floor(r["min"])), int(np.ceil(r["max"])), int(np.round(r["mean"])), step=step)
+        val = st.sidebar.slider(
+            f"{col}",
+            int(r["min"]), int(r["max"]),
+            int(r["mean"]), step=1
+        )
     input_vals[col] = val
 
 st.sidebar.markdown("---")
+
+# Botón de predicción
 if st.sidebar.button("🎯 Predecir Potencial"):
-    # construir df usuario
     df_user = pd.DataFrame([input_vals])
+
     predicted_label = None
     method_used = None
 
-    # 1) intentar usar clasificador entrenado
+    # 1) Clasificador entrenado
     if classifier is not None and scaler is not None:
         try:
             Xusr = scaler.transform(df_user[FEATURES_REG])
             pred = classifier.predict(Xusr)[0]
             predicted_label = "Tiene potencial" if int(pred) == 1 else "No tiene potencial"
-            method_used = "Clasificador (Logistic)"
-        except Exception as e:
+            method_used = "Clasificador (Logistic Regression)"
+        except:
             predicted_label = None
 
-    # 2) si no hay clasificador, intentar usar regresión: entrenar regresión simple y comparar con umbral
+    # 2) Si no funciona, usar regresión + umbral
     if predicted_label is None:
-        # si existe global_score en df_nba entreno regresión simple
-        if TARGET in df_nba.columns and all([c in df_nba.columns for c in FEATURES_REG]):
-            try:
-                df_reg = df_nba.dropna(subset=FEATURES_REG + [TARGET])
-                if not df_reg.empty:
-                    X = df_reg[FEATURES_REG]
-                    y = df_reg[TARGET]
-                    reg = LinearRegression()
-                    reg.fit(X, y)
-                    yhat = reg.predict(df_user[FEATURES_REG])[0]
-                    if potential_threshold is not None:
-                        predicted_label = "Tiene potencial" if yhat >= potential_threshold else "No tiene potencial"
-                        method_used = "Regresión -> umbral (percentil 75)"
-                    else:
-                        # fallback heuristic: arriba de la media
-                        med = df_reg[TARGET].median()
-                        predicted_label = "Tiene potencial" if yhat >= med else "No tiene potencial"
-                        method_used = "Regresión -> umbral (media)"
-            except Exception as e:
-                predicted_label = None
+        if TARGET in df_nba.columns:
+            df_reg = df_nba.dropna(subset=FEATURES_REG + [TARGET])
+            if not df_reg.empty:
+                reg = LinearRegression()
+                reg.fit(df_reg[FEATURES_REG], df_reg[TARGET])
+                yhat = reg.predict(df_user[FEATURES_REG])[0]
 
-    # 3) heurística final: usar ts_pct_score y usg_pct_score simple rule (ejemplo)
+                if potential_threshold:
+                    predicted_label = "Tiene potencial" if yhat >= potential_threshold else "No tiene potencial"
+                    method_used = "Regresión + umbral"
+                else:
+                    predicted_label = "Tiene potencial" if yhat >= df_reg[TARGET].median() else "No tiene potencial"
+                    method_used = "Regresión + media"
+
+    # 3) Último fallback (heurística)
     if predicted_label is None:
-        ts = input_vals.get("ts_pct_score", 0)
-        usg = input_vals.get("usg_pct_score", 0)
-        # heurística simple: alta eficiencia y moderado-alto uso -> potencial
-        if ts >= 0.58 and usg >= 0.2:
-            predicted_label = "Tiene potencial"
-        else:
-            predicted_label = "No tiene potencial"
+        ts = input_vals["ts_pct_score"]
+        usg = input_vals["usg_pct_score"]
+        predicted_label = "Tiene potencial" if (ts > 0.58 and usg > 0.20) else "No tiene potencial"
         method_used = "Heurística simple"
 
-    # Mostrar resultado
-    st.sidebar.markdown("---")
+    # Mostrar resultado bonito
     st.sidebar.markdown(
         f"""
-        <div style='text-align:center; padding:10px; border-radius:8px; background:{COLOR_1};'>
-            <p style='margin:0; color:white;'>Resultado</p>
-            <h2 style='margin:0; color:{COLOR_ACCENT};'>{predicted_label}</h2>
+        <div style='background:{COLOR_1}; padding:10px; border-radius:8px; text-align:center;'>
+            <p style='color:white;'>Resultado:</p>
+            <h2 style='color:{COLOR_ACCENT}; margin:0;'>{predicted_label}</h2>
             <small style='color:white;'>Método: {method_used}</small>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-st.sidebar.markdown("---")
-st.sidebar.write("Umbral de potencial (percentil 75) calculado a partir del dataset cargado: ")
-st.sidebar.write(f"**{potential_threshold:.4f}**" if potential_threshold is not None else "N/A")
 
 # ============================
 # MAIN: EDA (Barras, Línea, Scatter)
@@ -391,4 +387,5 @@ else:
     st.info("No hay dataset principal para descargar.")
 
 st.caption("App generada a partir del repositorio: https://github.com/MelRossi/App-rendimiento-nba")
+
 
