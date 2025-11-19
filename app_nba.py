@@ -72,7 +72,7 @@ st.markdown(
 # 1. CARGA DE DATOS (pantalla principal)
 # ======================================================
 
-st.markdown("<div class='title'>🏀 NBA Análisis de Rendimiento</div>", unsafe_allow_html=True)
+st.markdown("<div class='title'>🏀 Análisis de Rendimiento - NBA</div>", unsafe_allow_html=True)
 st.markdown("<div class='subtitle'>EDA, Clustering y Modelos de Predicción</div>", unsafe_allow_html=True)
 st.markdown("---")
 
@@ -397,6 +397,58 @@ else:
 
 st.markdown("---")
 
+# Conclusión
+st.markdown(
+    f"""
+    <h3 style='color:{COLOR_ACCENT}; font-weight:700; margin-top:20px;'>
+        📘 Conclusiones del Modelo (Interpretación de Importancias)
+    </h3>
+    """,
+    unsafe_allow_html=True
+)
+
+conclusion_df = pd.DataFrame([
+    ["ts_pct_score (Eficiencia de tiro)", "0.361", 
+     "Es el factor más determinante del rendimiento total. Los jugadores eficientes al anotar elevan fuertemente su valor global."],
+
+    ["usg_pct_score (Uso / volumen ofensivo)", "0.264",
+     "Ser protagonista en la ofensiva aporta fuertemente al rendimiento. Mayor uso suele significar mayor impacto general."],
+
+    ["dreb_pct_score (Rebote defensivo)", "0.158",
+     "Contribuir en rebotes defensivos está directamente vinculado con un mejor rendimiento total."],
+
+    ["ast_pct_score (Playmaking)", "0.126",
+     "La capacidad de generar asistencias influye notablemente, aunque menos que la eficiencia de tiro y el volumen ofensivo."],
+
+    ["oreb_pct_score (Rebote ofensivo)", "0.051",
+     "Aporta positivamente, aunque su peso es menor en comparación con los rebotes defensivos."],
+
+    ["Aspectos físicos (peso, altura) y edad", "Muy baja importancia",
+     "Las características físicas explican muy poco el rendimiento cuando ya se consideran métricas avanzadas de juego."]
+],
+    columns=["Variable", "Importancia", "Interpretación"]
+)
+
+st.dataframe(conclusion_df, use_container_width=True)
+
+# Conclusión final en texto
+st.markdown(
+    f"""
+    <div style='margin-top:15px; color:white; font-size:16px;'>
+        En resumen, el modelo confirma que el <b style="color:{COLOR_ACCENT};">rendimiento global</b> 
+        de un jugador NBA está impulsado principalmente por tres pilares:
+        <ul>
+            <li><b>Eficiencia de tiro</b> (ts_pct_score)</li>
+            <li><b>Volumen ofensivo</b> (usg_pct_score)</li>
+            <li><b>Rebote defensivo</b> (dreb_pct_score)</li>
+        </ul>
+        Métricas como asistencias y rebote ofensivo también suman, pero en menor medida.  
+        Finalmente, la <b>edad, peso y altura</b> tienen un impacto muy reducido cuando se consideran estadísticas avanzadas de rendimiento.
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 # ======================================================
 # 8. KMEANS (SIEMPRE SOBRE nba_puntaje_vara.csv)
 # ======================================================
@@ -496,6 +548,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
