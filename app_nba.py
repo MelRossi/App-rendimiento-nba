@@ -1,13 +1,3 @@
-# app_final.py
-"""
-App Streamlit - NBA Performance Analytics (Multi CSV)
-Carga automática desde tu repo GitHub, EDA (Bar / Line / Scatter),
-RandomForest Regression, KMeans clustering y Predicción manual de 'potencial'.
-
-Copia/pega este archivo y ejecútalo con:
-    streamlit run app_final.py
-"""
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -32,6 +22,18 @@ COLOR_ACCENT = "#F28705"
 COLOR_1 = "#025159"
 COLOR_2 = "#038C8C"
 COLOR_3 = "#03A696"
+
+# LOGO en la esquina superior derecha
+LOGO_URL = "https://raw.githubusercontent.com/MelRossi/App-rendimiento-nba/main/Image_logo.png"
+
+st.markdown(
+    f"""
+    <div style="display:flex; justify-content:flex-end; margin-top:-30px; margin-bottom:-20px;">
+        <img src="{LOGO_URL}" alt="Logo" style="width:130px; border-radius:10px;">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # Ensanchar sidebar y escala de plots (CSS)
 st.markdown(
@@ -85,12 +87,14 @@ CSV_FILES = {
     "player": "player_filtrado.csv",
     "team": "team_filtrado.csv",
     "line_score": "line_score_filtrado.csv",
-    "puntaje": "nba_puntaje_vara.csv",
+    "puntaje": "nba_puntaje_vara.csv", # Este es el principal, se puede reemplazar
     "resumen": "resumen.csv"
 }
 
+# --- FUNCIÓN PARA CARGAR LOS 7 ARCHIVOS PREDETERMINADOS ---
 @st.cache_data
 def load_all_csvs(base_url, csv_files):
+    """Carga los 7 archivos predeterminados desde GitHub."""
     dfs = {}
     msgs = {}
     for key, fname in csv_files.items():
@@ -98,16 +102,76 @@ def load_all_csvs(base_url, csv_files):
         try:
             df = pd.read_csv(url)
             dfs[key] = df
-            msgs[key] = f"Cargado: {fname} ({len(df):,} filas)"
+            msgs[key] = f"Cargado (DEFECTO): {fname} ({len(df):,} filas)"
         except Exception as e:
             dfs[key] = pd.DataFrame()
-            msgs[key] = f"No se pudo cargar {fname}: {e}"
+            msgs[key] = f"No se pudo cargar {fname} (DEFECTO): {e}"
     return dfs, msgs
 
-dfs, load_msgs = load_all_csvs(RAW_BASE, CSV_FILES)
+# --- FUNCIÓN PARA CARGAR UN ÚNICO ARCHIVO SUBIDO POR EL USUARIO ---
+def load_uploaded_data(uploaded_file):
+    """Carga datos desde un archivo CSV subido por el usuario."""
+    try:
+        data = pd.read_csv(uploaded_file, encoding='latin-1')
+        return data
+    except Exception as e:
+        st.error(f"Error al cargar el archivo: {e}. Asegúrate de que es un archivo CSV válido y contiene las columnas necesarias.")
+        return pd.DataFrame()
 
 # ----------------------
-# Encabezado y estado
+# SIDEBAR: Carga de Datos (Prioridad)
+# ----------------------
+st.sidebar.markdown(f"<h3 style='color:{COLOR_ACCENT};'>📂 Carga de Datos</h3>", unsafe_allow_html=True)
+uploaded_file = st.sidebar.file_uploader(
+    "Cargar un archivo CSV (e.g., el archivo 'puntaje' procesado) para reemplazar el dataset principal.",
+    type=["csv"]
+)
+
+# ----------------------
+# Lógica Principal de Carga Condicional
+# ----------------------
+
+# Inicialización de variables de estado
+dfs = {}
+load_msgs = {}
+df_nba = pd.DataFrame()
+data_source = "DEFAULT"
+
+if uploaded_file is not None:
+    # 1. Prioridad: Archivo subido
+    df_nba = load_uploaded_data(uploaded_file)
+    
+    if not df_nba.empty:
+        # Si se carga con éxito, lo asignamos como el dataset principal y marcamos los otros como reemplazados
+        dfs["puntaje"] = df_nba.copy()
+        load_msgs["puntaje"] = f"Cargado (USUARIO): {uploaded_file.name} ({len(df_nba):,} filas)"
+        
+        for key in CSV_FILES.keys():
+            if key != "puntaje":
+                dfs[key] = pd.DataFrame()
+                load_msgs[key] = "Reemplazado por carga de usuario."
+        data_source = "UPLOADED"
+        st.success(f"¡Datos cargados desde el archivo subido! 🎉 ({uploaded_file.name})")
+    
+else:
+    # 2. Opción por defecto: Cargar desde GitHub
+    
+    # Mensaje ÚNICO requerido por el usuario
+    st.info("⚠️ **Aviso:** Si no se cargan nuevos datos (arriba a la izquierda), se utilizarán los 7 archivos predeterminados de GitHub para el análisis.")
+    
+    # Cargar los archivos predeterminados
+    dfs, load_msgs = load_all_csvs(RAW_BASE, CSV_FILES)
+
+    # ----------------------
+    # Seleccionar dataset principal (Mismo que en el código original)
+    # ----------------------
+    df_nba = dfs.get("puntaje", pd.DataFrame()).copy()
+    if df_nba.empty:
+        df_nba = dfs.get("all_seasons", pd.DataFrame()).copy()
+    data_source = "DEFAULT"
+
+# ----------------------
+# Encabezado y estado (Actualizado para mostrar el origen)
 # ----------------------
 st.markdown("<div class='title'>🏀 NBA Performance Analytics (Multi CSV)</div>", unsafe_allow_html=True)
 st.markdown(f"<div class='subtitle'>EDA, Clustering y Predicción simple de potencial</div>", unsafe_allow_html=True)
@@ -115,28 +179,31 @@ st.markdown("---")
 
 col_left, col_right = st.columns([3,1])
 with col_left:
-    st.header("📂 Datasets cargados")
+    st.header(f"📂 Datasets cargados (Fuente: {data_source})")
     for k in CSV_FILES.keys():
         m = load_msgs.get(k, "")
-        if m.startswith("Cargado"):
+        if m.startswith("Cargado (DEFECTO)"):
             st.success(m)
+        elif m.startswith("Cargado (USUARIO)"):
+            st.success(m)
+        elif m == "Reemplazado por carga de usuario.":
+             st.info(f"Tabla '{k}' no usada, reemplazada por el archivo subido.")
         else:
             st.warning(m)
 with col_right:
-    st.write("")  # espacio a la derecha (no hay logo local por seguridad)
+    st.write("") # espacio a la derecha (no hay logo local por seguridad)
 
 # ----------------------
-# Seleccionar dataset principal
+# Verificar si el DataFrame principal se cargó
 # ----------------------
-# Prioridad: 'puntaje' (nba_puntaje_vara.csv) -> 'all_seasons'
-df_nba = dfs.get("puntaje", pd.DataFrame()).copy()
 if df_nba.empty:
-    df_nba = dfs.get("all_seasons", pd.DataFrame()).copy()
-
-if df_nba.empty:
-    st.error("No se pudo cargar el dataset principal (nba_puntaje_vara.csv o all_seasons_filtrado.csv). Algunas funcionalidades estarán limitadas.")
+    st.error("❌ No se pudo cargar el **dataset principal** (ni por archivo, ni por defecto). Asegúrate de que los archivos de GitHub existen o que el archivo subido es válido.")
+    # Evitar que el resto del código falle
+    st.stop() 
 else:
-    st.success(f"Dataset principal listo: {df_nba.shape[0]:,} filas x {df_nba.shape[1]:,} columnas")
+    # Este mensaje ahora es redundante con el éxito del 'puntaje' o el 'uploaded file'
+    # st.success(f"Dataset principal listo: {df_nba.shape[0]:,} filas x {df_nba.shape[1]:,} columnas")
+    pass
 
 st.markdown("---")
 
@@ -275,6 +342,8 @@ if predict_button:
                     med = df_reg[TARGET].median()
                     result_label = "Tiene potencial" if yhat >= med else "No tiene potencial"
                     method = "RandomForestRegressor -> umbral (mediana)"
+            else:
+                st.warning("No hay suficientes datos limpios para entrenar el modelo de regresión de respaldo.")
         except Exception:
             result_label = None
 
