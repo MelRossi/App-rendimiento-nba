@@ -399,7 +399,7 @@ else:
 st.markdown(
     f"""
     <h3 style='color:{COLOR_ACCENT}; font-weight:700; margin-top:20px;'>
-        📘 Conclusiones del Modelo (Interpretación de Importancias)
+        Conclusiones del Modelo (Interpretación de Importancias)
     </h3>
     """,
     unsafe_allow_html=True
@@ -500,7 +500,7 @@ st.markdown("---")
 # ========= CONCLUSIÓN AUTOMÁTICA DEL CLUSTERING =========
 
 st.markdown(
-    f"<h3 style='color:{COLOR_ACCENT}; margin-top:25px;'>📌 Conclusión del análisis de Clustering</h3>",
+    f"<h3 style='color:{COLOR_ACCENT}; margin-top:25px;'>Conclusión del análisis de Clustering</h3>",
     unsafe_allow_html=True
 )
 
@@ -547,6 +547,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
