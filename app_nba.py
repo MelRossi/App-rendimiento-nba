@@ -433,25 +433,28 @@ conclusion_df = pd.DataFrame([
 st.dataframe(conclusion_df, use_container_width=True)
 
 # Conclusión final en texto
-st.markdown(
-    f"""
-    <div style='margin-top:15px; color:white; font-size:16px;'>
-        En resumen, el modelo confirma que el <b style="color:{COLOR_ACCENT};">rendimiento global</b> 
-        de un jugador NBA está impulsado principalmente por tres pilares:
+
+conclusion_texto= """
+En resumen, el modelo confirma que el <b style="color:{COLOR_ACCENT};">rendimiento global</b> de un jugador NBA está impulsado principalmente por tres pilares:
         <ul>
             <li><b>Eficiencia de tiro</b> (ts_pct_score)</li>
             <li><b>Volumen ofensivo</b> (usg_pct_score)</li>
             <li><b>Rebote defensivo</b> (dreb_pct_score)</li>
         </ul>
-        Métricas como asistencias y rebote ofensivo también suman, pero en menor medida.  
-        Finalmente, la <b>edad, peso y altura</b> tienen un impacto muy reducido cuando se consideran estadísticas avanzadas de rendimiento.
-    </div style="
+Métricas como asistencias y rebote ofensivo también suman, pero en menor medida.  
+Finalmente, la <b>edad, peso y altura</b> tienen un impacto muy reducido cuando se consideran estadísticas avanzadas de rendimiento.
+"""
+
+st.markdown(
+    f"""
+    <div style="
         background-color:{COLOR_1};
         padding:18px;
         border-radius:12px;
         color:white;
         line-height:1.6;
     ">
+        {conclusion_texto}
     """,
     unsafe_allow_html=True
 )
@@ -555,6 +558,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
