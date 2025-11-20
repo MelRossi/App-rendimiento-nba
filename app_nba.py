@@ -287,18 +287,21 @@ try:
         g = df_nba.groupby(xcol)[ycol].mean().reset_index()
         sns.barplot(data=g, x=xcol, y=ycol, ax=ax, palette="crest")
         ax.set_title(f"{ycol} por {xcol}", color=COLOR_3)
+        plt.xticks(rotation=60)
 
     elif tipo == "Línea":
         g = df_nba[[xcol,ycol]].dropna().sort_values(xcol)
         sns.lineplot(data=g, x=xcol, y=ycol, ax=ax, color=COLOR_2)
         ax.set_title(f"{ycol} vs {xcol}", color=COLOR_3)
+        plt.xticks(rotation=60)
 
-    else:
+    else:  # Scatter
         sns.scatterplot(data=df_nba, x=xcol, y=ycol, ax=ax, color=COLOR_ACCENT)
         ax.set_title(f"Scatter: {ycol} vs {xcol}", color=COLOR_3)
+        plt.xticks(rotation=60)
 
-except:
-    st.warning("No se pudo generar gráfico con esas columnas.")
+except Exception as e:
+    st.warning(f"No se pudo generar gráfico con esas columnas. {e}")
 
 st.markdown('<div class="plot-container">', unsafe_allow_html=True)
 st.pyplot(fig)
@@ -546,6 +549,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
