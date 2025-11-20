@@ -445,7 +445,13 @@ st.markdown(
         </ul>
         Métricas como asistencias y rebote ofensivo también suman, pero en menor medida.  
         Finalmente, la <b>edad, peso y altura</b> tienen un impacto muy reducido cuando se consideran estadísticas avanzadas de rendimiento.
-    </div>
+    </divstyle="
+        background-color:{COLOR_1};
+        padding:18px;
+        border-radius:12px;
+        color:white;
+        line-height:1.6;
+    ">
     """,
     unsafe_allow_html=True
 )
@@ -549,6 +555,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
