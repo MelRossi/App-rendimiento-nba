@@ -432,16 +432,35 @@ st.dataframe(conclusion_df, use_container_width=True)
 # Conclusión final en texto
 st.markdown(
     f"""
-    <div style='margin-top:15px; color:white; font-size:16px;'>
-        En resumen, el modelo confirma que el <b style="color:{COLOR_ACCENT};">rendimiento global</b> 
-        de un jugador NBA está impulsado principalmente por tres pilares:
+    <div style="
+        background-color: rgba(255,255,255,0.05);
+        border: 2px solid {COLOR_ACCENT};
+        padding: 18px;
+        border-radius: 10px;
+        margin-top: 20px;
+        font-size: 16px;
+        line-height: 1.6;
+    ">
+        <h4 style="color:{COLOR_ACCENT}; margin-top:0; margin-bottom:10px;">
+            📘 Conclusión del Modelo RandomForest
+        </h4>
+
+        En resumen, el modelo confirma que el 
+        <b style="color:{COLOR_ACCENT};">rendimiento global de un jugador NBA</b> 
+        está impulsado principalmente por tres pilares:
+
         <ul>
-            <li><b>Eficiencia de tiro</b> (ts_pct_score)</li>
-            <li><b>Volumen ofensivo</b> (usg_pct_score)</li>
-            <li><b>Rebote defensivo</b> (dreb_pct_score)</li>
+            <li><b>Eficiencia de tiro (ts_pct_score)</b></li>
+            <li><b>Volumen ofensivo (usg_pct_score)</b></li>
+            <li><b>Rebote defensivo (dreb_pct_score)</b></li>
         </ul>
-        Métricas como asistencias y rebote ofensivo también suman, pero en menor medida.  
-        Finalmente, la <b>edad, peso y altura</b> tienen un impacto muy reducido cuando se consideran estadísticas avanzadas de rendimiento.
+
+        Métricas como <b>asistencias</b> y <b>rebote ofensivo</b> también aportan al rendimiento, 
+        pero en menor medida.
+
+        Finalmente, variables como <b>edad</b>, <b>altura</b> y <b>peso</b> presentan un 
+        <b style="color:{COLOR_ACCENT};">impacto muy reducido</b> cuando se consideran 
+        estadísticas avanzadas de juego.
     </div>
     """,
     unsafe_allow_html=True
@@ -545,6 +564,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
