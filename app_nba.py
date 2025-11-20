@@ -180,7 +180,7 @@ if TARGET in df_nba.columns:
 # 4. SIDEBAR — PREDICCIÓN
 # ======================================================
 
-st.sidebar.markdown(f"<h3 style='color:{COLOR_ACCENT};'>🎯 Predicción de Potencial</h3>", unsafe_allow_html=True)
+st.sidebar.markdown(f"<h3 style='color:{COLOR_ACCENT};'>Encontrá el potencial del Jugador</h3>", unsafe_allow_html=True)
 
 DEFAULT_R = {
     "ts_pct_score": (0.0, 1.0, 0.55),
@@ -558,6 +558,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
