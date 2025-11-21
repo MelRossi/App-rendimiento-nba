@@ -72,7 +72,7 @@ st.markdown(
 # 1. CARGA DE DATOS (pantalla principal)
 # ======================================================
 
-st.markdown("<div class='title'>🏀 Análisis de Rendimiento - NBA</div>", unsafe_allow_html=True)
+st.markdown("<div class='title'>🏀 Decisiones Inteligentes - NBA</div>", unsafe_allow_html=True)
 st.markdown("<div class='subtitle'>EDA, Clustering y Modelos de Predicción</div>", unsafe_allow_html=True)
 st.markdown("---")
 
@@ -558,6 +558,7 @@ st.download_button(
     "dataset_procesado.csv",
     "text/csv"
 )
+
 
 
 
